@@ -2,20 +2,22 @@ package forex.interfaces.api.rates
 
 import akka.http.scaladsl._
 import forex.domain._
+import forex.interfaces.api.utils.Error.ApiError
 
 trait Directives {
   import server.Directives._
-  import unmarshalling.Unmarshaller
   import Protocol._
 
-  def getApiRequest: server.Directive1[GetApiRequest] =
-    for {
-      from ← parameter('from.as(currency))
-      to ← parameter('to.as(currency))
-    } yield GetApiRequest(from, to)
-
-  private val currency =
-    Unmarshaller.strict[String, Currency](Currency.fromString)
+  def getApiRequest: server.Directive1[Either[ApiError, GetApiRequest]] = {
+    val maybeFromAndTo = for {
+      maybeFrom ← parameter('from.?)
+      maybeTo ← parameter('to.?)
+    } yield for {
+      from ← maybeFrom
+      to ← maybeTo
+    } yield GetApiRequest(Currency.fromString(from), Currency.fromString(to))
+    maybeFromAndTo.map(_.toRight(ApiError("Both Get parameters `from` and `to` are mandatory")))
+  }
 
 }
 

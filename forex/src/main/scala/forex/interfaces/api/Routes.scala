@@ -14,7 +14,7 @@ case class Routes(
   lazy val route: server.Route =
     handleExceptions(ApiExceptionHandler()) {
       handleRejections(ApiRejectionHandler()) {
-        ratesRoutes.route
+        ratesRoutes.exchangeRateRoute
       }
     }
 }

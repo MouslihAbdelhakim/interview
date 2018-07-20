@@ -1,11 +1,9 @@
 package forex.services.oneforge
 
-import java.time.OffsetDateTime
-
 import forex.domain._
+import forex.interfaces.api.utils.Error
 import monix.eval.Task
 import org.atnos.eff._
-import org.atnos.eff.all._
 import org.atnos.eff.addon.monix.task._
 
 object Interpreters {

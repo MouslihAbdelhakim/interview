@@ -19,15 +19,21 @@ case class Routes(
   import processes._
   import runners._
 
-  lazy val route: server.Route =
+  lazy val exchangeRateRoute: server.Route =
     get {
-      getApiRequest { req ⇒
-        complete {
-          runApp(
+      path("exchangeRate") {
+        getApiRequest { maybeApiRequest  ⇒
+          val runnableApp = for {
+            req ← maybeApiRequest
+            getRequest ← toGetRequest(req)
+          } yield runApp(
             Rates
-              .get(toGetRequest(req))
+              .get(getRequest)
               .map(_.map(result ⇒ toGetApiResponse(result)))
           )
+          complete {
+            runnableApp
+          }
         }
       }
     }

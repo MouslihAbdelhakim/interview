@@ -1,6 +1,7 @@
 package forex.interfaces.api.rates
 
 import forex.domain._
+import forex.interfaces.api.utils.Error.ApiError
 import forex.processes.rates.messages._
 
 object Converters {
@@ -8,8 +9,19 @@ object Converters {
 
   def toGetRequest(
       request: GetApiRequest
-  ): GetRequest =
-    GetRequest(request.from, request.to)
+  ): Either[ApiError,GetRequest] = request match {
+    case GetApiRequest(Right(from), Right(to)) ⇒
+      Right(GetRequest(from, to))
+
+    case GetApiRequest(Left(fromErrorMessage), Left(toErrorMessage)) ⇒
+      Left(ApiError(s"$fromErrorMessage and $toErrorMessage"))
+
+    case GetApiRequest(Left(errorMessage),_) ⇒
+      Left(ApiError(errorMessage))
+
+    case GetApiRequest(_, Left(errorMessage)) ⇒
+      Left(ApiError(errorMessage))
+  }
 
   def toGetApiResponse(
       rate: Rate
