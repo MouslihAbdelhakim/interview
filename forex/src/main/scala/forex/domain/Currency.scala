@@ -61,30 +61,30 @@ object Currency {
     LTC,
     XRP,
     DSH,
-    BCH)
+    BCH
+  )
 
   implicit val show: Show[Currency] = Show.show(_.toString)
 
-  def fromString(s: String): Either[String,Currency] = {
-    val upperCaseString = s.toUpperCase
-    listOfCurrencies
-      .find(_.toString == upperCaseString)
+  def fromString(s: String): Either[String, Currency] =
+    currencies
+      .get(s.toUpperCase)
       .toRight(s"$s is not a supported currency code")
-  }
 
   implicit val encoder: Encoder[Currency] =
     Encoder.instance[Currency] { show.show _ andThen Json.fromString }
 
-  implicit val decoder: Decoder[Currency] = Decoder.instance { cursor =>
+  implicit val decoder: Decoder[Currency] = Decoder.instance { cursor ⇒
     def currencyFromString(currencyCode: String): Decoder.Result[Currency] = fromString(currencyCode) match {
-      case Right(currency) => Right(currency)
-      case Left(error) => Left(DecodingFailure(error, Nil))
+      case Right(currency) ⇒ Right(currency)
+      case Left(error) ⇒ Left(DecodingFailure(error, Nil))
     }
 
-     for {
-      currencyCode <- cursor.as[String]
-      currency <- currencyFromString(currencyCode)
+    for {
+      currencyCode ← cursor.as[String]
+      currency ← currencyFromString(currencyCode)
     } yield currency
   }
 
+  private val currencies = listOfCurrencies.map(currency ⇒ currency.toString → currency).toMap
 }

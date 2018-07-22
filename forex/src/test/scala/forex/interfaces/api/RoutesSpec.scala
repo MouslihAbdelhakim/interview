@@ -1,20 +1,34 @@
 package forex.interfaces.api
 
-import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.http.scaladsl.model.{ StatusCode, StatusCodes }
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
-import forex.domain.Currency
+import forex.domain.{ Currency, Rate, Timestamp }
 import forex.interfaces.api.rates.Protocol.GetApiResponse
-import org.scalatest.{FlatSpec, Matchers}
-import forex.main.{Processes, Runners}
+import forex.interfaces.api.utils.Error
+import org.scalatest.{ FlatSpec, Matchers }
+import forex.main.Processes
 import org.scalatest.prop.TableDrivenPropertyChecks
-import forex.interfaces.api.utils.Error.{ApiError, InternalError}
+import forex.interfaces.api.utils.Error.{ ApiError, InternalError }
+import forex.processes
+import forex.services.OneForge
+
+import scala.concurrent.Future
 
 class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with TableDrivenPropertyChecks {
 
   import forex.interfaces.api.utils.ApiMarshallers._
 
-  val forexApp = Routes(rates.Routes(Processes(), Runners())).route
+  val process = new Processes {
+    override implicit val _oneForge: OneForge[Future] = new OneForge[Future] {
+      override def get(pair: Rate.Pair): Future[Either[Error.BackEndError, Rate]] = Future {
+        Right(Rate(pair.from, pair.to, 1, Timestamp.now.value))
+      }
+    }
+    override val Rates: processes.rates.Processes[Future] = processes.Rates[Future]
+  }
+
+  val forexApp = Routes(rates.Routes(process)).route
 
   val currencyPairs = {
     val emptyTable = Table[Currency, Currency](
@@ -22,38 +36,34 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
     )
 
     val allCurrencyPairs = for {
-      from <- Currency.listOfCurrencies
-      to <- Currency.listOfCurrencies
+      from ← Currency.listOfCurrencies
+      to ← Currency.listOfCurrencies
     } yield (from, to)
 
     emptyTable ++ allCurrencyPairs
   }
 
-  def checkHttpCodeStatus(route: Route, path: String, expectedCodeStatus: StatusCode) = {
+  def checkHttpCodeStatus(route: Route, path: String, expectedCodeStatus: StatusCode) =
     Get(path) ~> route ~> check {
       status shouldEqual expectedCodeStatus
     }
-  }
 
-  def checkThatPathReturnsAnApiError(route: Route, path: String) = {
+  def checkThatPathReturnsAnApiError(route: Route, path: String) =
     Get(path) ~> route ~> check {
       responseAs[ApiError] shouldBe a[ApiError]
     }
-  }
 
-  def checkThatPathReturnsAnInternalError(route: Route, path: String) = {
+  def checkThatPathReturnsAnInternalError(route: Route, path: String) =
     Get(path) ~> route ~> check {
       responseAs[InternalError] shouldBe a[InternalError]
     }
-  }
 
-  def checkThatPathReturnsAGetApiResponse(route: Route, path: String) = {
+  def checkThatPathReturnsAGetApiResponse(route: Route, path: String) =
     Get(path) ~> route ~> check {
       responseAs[GetApiResponse] shouldBe a[GetApiResponse]
     }
-  }
 
-  "Forex" should  "return Http code = BadRequest if Get query parameters `to` and `from` are not present" in
+  "Forex" should "return Http code = BadRequest if Get query parameters `to` and `from` are not present" in
     checkHttpCodeStatus(forexApp, "/exchangeRate?", StatusCodes.BadRequest)
 
   it should "return Http code = BadRequest if Get query parameters `to` is not present" in
@@ -63,7 +73,7 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
     checkHttpCodeStatus(forexApp, "/exchangeRate?to=USD&", StatusCodes.BadRequest)
 
   it should "return Http code = BadRequest if Get query Parameter `from` contains an unsupported currency" in
-  checkHttpCodeStatus(forexApp, "/exchangeRate?from=pennySilver&to=USD", StatusCodes.BadRequest)
+    checkHttpCodeStatus(forexApp, "/exchangeRate?from=pennySilver&to=USD", StatusCodes.BadRequest)
 
   it should "return Http code = BadRequest if Get query Parameter `to` contains an unsupported currency" in
     checkHttpCodeStatus(forexApp, "/exchangeRate?from=USD&to=SilverPennies", StatusCodes.BadRequest)
@@ -72,10 +82,11 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
     checkHttpCodeStatus(forexApp, "/path?from=USD&to=USD", StatusCodes.NotFound)
 
   it should "return Http code = OK for all supported currencies" in forAll(currencyPairs) {
-    (from: Currency, to:Currency) ⇒ checkHttpCodeStatus(forexApp, s"/exchangeRate?from=$from&to=$to", StatusCodes.OK)
+    (from: Currency, to: Currency) ⇒
+      checkHttpCodeStatus(forexApp, s"/exchangeRate?from=$from&to=$to", StatusCodes.OK)
   }
 
-  it should  "return a JSON object of ApiError if Get query parameters `to` and `from` are not present" in
+  it should "return a JSON object of ApiError if Get query parameters `to` and `from` are not present" in
     checkThatPathReturnsAnApiError(forexApp, "/exchangeRate?")
 
   it should "return a JSON object of ApiError if Get query parameters `to` is not present" in
@@ -94,11 +105,12 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
     checkThatPathReturnsAnInternalError(forexApp, "/path?from=USD&to=USD")
 
   it should "return a JSON object of InternalError for all supported currencies" in forAll(currencyPairs) {
-    (from: Currency, to:Currency) ⇒ checkThatPathReturnsAGetApiResponse(forexApp, s"/exchangeRate?from=$from&to=$to")
+    (from: Currency, to: Currency) ⇒
+      checkThatPathReturnsAGetApiResponse(forexApp, s"/exchangeRate?from=$from&to=$to")
   }
 
   it should "return a JSON object with the same currency in the Get query parameters `from`" in forAll(currencyPairs) {
-    (from: Currency, to:Currency) ⇒
+    (from: Currency, to: Currency) ⇒
       Get(s"/exchangeRate?from=$from&to=$to") ~> forexApp ~> check {
         val getApiResponse = responseAs[GetApiResponse]
         getApiResponse.from shouldBe from
@@ -106,7 +118,7 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
   }
 
   it should "return a JSON object with the same currency in the Get query parameters `to`" in forAll(currencyPairs) {
-    (from: Currency, to:Currency) ⇒
+    (from: Currency, to: Currency) ⇒
       Get(s"/exchangeRate?from=$from&to=$to") ~> forexApp ~> check {
         val getApiResponse = responseAs[GetApiResponse]
         getApiResponse.to shouldBe to

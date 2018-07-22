@@ -9,6 +9,7 @@ sealed trait Error extends Throwable with NoStackTrace
 object Error {
   final case class ApiError(message: String) extends Error
   final case class InternalError(message: String) extends Error
+  final case class BackEndError(error: String) extends Error
 
   object ApiError {
     implicit val encoder: Encoder[ApiError] =
@@ -24,6 +25,14 @@ object Error {
 
     implicit val decoder: Decoder[InternalError] =
       deriveDecoder[InternalError]
+  }
+
+  object BackEndError {
+    implicit val encoder: Encoder[BackEndError] =
+      deriveEncoder[BackEndError]
+
+    implicit val decoder: Decoder[BackEndError] =
+      deriveDecoder[BackEndError]
   }
 
 }

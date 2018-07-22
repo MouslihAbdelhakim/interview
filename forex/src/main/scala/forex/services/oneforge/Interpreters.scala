@@ -1,26 +1,8 @@
 package forex.services.oneforge
 
-import forex.domain._
-import forex.interfaces.api.utils.Error
-import monix.eval.Task
-import org.atnos.eff._
-import org.atnos.eff.addon.monix.task._
+import akka.actor.ActorRef
+import scala.concurrent.Future
 
 object Interpreters {
-  def dummy[R](
-      implicit
-      m1: _task[R]
-  ): Algebra[Eff[R, ?]] = new Dummy[R]
-}
-
-final class Dummy[R] private[oneforge] (
-    implicit
-    m1: _task[R]
-) extends Algebra[Eff[R, ?]] {
-  override def get(
-      pair: Rate.Pair
-  ): Eff[R, Error Either Rate] =
-    for {
-      result ← fromTask(Task.now(Rate(pair, Price(BigDecimal(100)), Timestamp.now)))
-    } yield Right(result)
+  def live(oneForgeBackEnd: ActorRef): Algebra[Future] = new LiveInterpreter(oneForgeBackEnd)
 }

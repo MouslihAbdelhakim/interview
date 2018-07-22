@@ -2,7 +2,7 @@ package forex.interfaces.api.utils
 
 import akka.http.scaladsl._
 import akka.http.scaladsl.model._
-import forex.interfaces.api.utils.Error.{ApiError, InternalError}
+import forex.interfaces.api.utils.Error.{ ApiError, BackEndError, InternalError }
 
 object ApiExceptionHandler {
 
@@ -10,17 +10,21 @@ object ApiExceptionHandler {
 
   def apply(): server.ExceptionHandler =
     server.ExceptionHandler {
-      case error : ApiError ⇒
+      case error: ApiError ⇒
         ctx ⇒
-          ctx.complete(StatusCodes.BadRequest -> error)
+          ctx.complete(StatusCodes.BadRequest → error)
 
       case error: InternalError ⇒
         ctx ⇒
-          ctx.complete(StatusCodes.InternalServerError -> error)
+          ctx.complete(StatusCodes.InternalServerError → error)
+
+      case error: BackEndError ⇒
+        ctx ⇒
+          ctx.complete(StatusCodes.InternalServerError → error)
 
       case t: Throwable ⇒
         ctx ⇒
-          ctx.complete(StatusCodes.InternalServerError -> InternalError(t.getMessage))
+          ctx.complete(StatusCodes.InternalServerError → InternalError(t.getMessage))
     }
 
 }
