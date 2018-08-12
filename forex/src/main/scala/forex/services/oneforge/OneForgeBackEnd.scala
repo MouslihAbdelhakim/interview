@@ -49,7 +49,8 @@ class OneForgeBackEnd(oneForgeEndPoint: OneForgeEndPoint,
         context.become(servingExchangeRatesForAWhile(availableRates, oldestTimeStamp, timeToWaitBeforeRefreshingInfo))
 
       case ExchangeRateFor(pair) ⇒
-        sender ! notYetInformation.map(serveFromNotYetAvailableInformation(_, pair))
+        notYetInformation.map(serveFromNotYetAvailableInformation(_, pair)).pipeTo(sender())
+        () // returning Unit
     }
 
     unstashAll()
@@ -62,7 +63,7 @@ class OneForgeBackEnd(oneForgeEndPoint: OneForgeEndPoint,
     case ExchangeRateFor(pair) ⇒
       val now = Timestamp.now.value.toEpochSecond
       if (now - lastTimeInfoWasRetrieved < timeToWaitBeforeRefreshingInfo) {
-        sender() ! Future(getRate(availableRates, pair))
+        sender() ! getRate(availableRates, pair)
       } else {
         stash()
         context.become(waitingForOneForge(oneForgeEndPoint.refresh))

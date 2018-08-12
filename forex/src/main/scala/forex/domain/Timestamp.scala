@@ -1,5 +1,7 @@
 package forex.domain
 
+import java.time.temporal.ChronoUnit
+
 import io.circe._
 import io.circe.generic.extras.semiauto._
 import io.circe.java8.time._
@@ -9,7 +11,7 @@ case class Timestamp(value: OffsetDateTime) extends AnyVal
 
 object Timestamp {
   def now: Timestamp =
-    Timestamp(Instant.now().atOffset(ZoneOffset.UTC))
+    Timestamp(Instant.now().atOffset(ZoneOffset.UTC).truncatedTo(ChronoUnit.SECONDS))
 
   def apply(epochInSeconds: Long): Timestamp =
     Timestamp(Instant.ofEpochSecond(epochInSeconds).atOffset(ZoneOffset.UTC))

@@ -15,7 +15,7 @@ class LiveInterpreter(
 ) extends Algebra[Future] {
   override def get(pair: Rate.Pair): Future[Either[OneForgeError, Rate]] = {
     implicit val timeout = Timeout(3 seconds)
-    ask(oneForgeEndPoint, ExchangeRateFor(pair)).mapTo[Future[Either[OneForgeError, Rate]]].flatten
+    ask(oneForgeEndPoint, ExchangeRateFor(pair)).mapTo[Either[OneForgeError, Rate]]
   }
 
 }

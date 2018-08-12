@@ -80,9 +80,14 @@ libraryDependencies ++= Seq(
   "ch.qos.logback"                 %  "logback-classic"      % logBackClassicVersion,
   "com.typesafe.scala-logging"     %% "scala-logging"        % scalaLogging,
   "org.scalactic"                  %% "scalactic"            % scalaTestVersion,
-  "org.scalatest"                  %% "scalatest"            % scalaTestVersion         % "test",
-  "org.scalacheck"                 %% "scalacheck"           % scalaCheckVersion        % "test",
+  "org.scalatest"                  %% "scalatest"            % scalaTestVersion         % "test,it",
+  "org.scalacheck"                 %% "scalacheck"           % scalaCheckVersion        % "test,it",
   "com.typesafe.akka"              %% "akka-http-testkit"    % akkaHttpVersion,
   compilerPlugin("org.spire-math"  %% "kind-projector"       % kingProjectorVersion),
   compilerPlugin("org.scalamacros" %% "paradise"             %  paradiseVersion cross CrossVersion.full)
 )
+
+
+lazy val root = (project in file("."))
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)

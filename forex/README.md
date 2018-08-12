@@ -81,7 +81,7 @@ The next two sections discuss the thoughts behind some of the decision that went
 
 The title of each section is the title of the related commit.
 
-### task #1 : Forex version 1.0.1
+### task 1 : Forex version 1.0.1
 This new version of Forex contains the following improvements
 
 * Updated all libraries to their latest versions, to incorporate any bug fixes or security patches.
@@ -102,7 +102,7 @@ This new version of Forex contains the following improvements
 * Updated forex version to 1.0.1
 
 
-### task #2 : Forex version 1.1.0, connecting Forex to the 1forge Api.
+### task 2 : Forex version 1.1.0, connecting Forex to the 1forge Api.
 This new version of Forex contains the following improvements:
 * Serving real exchange rates retrieved from 1forge
 
@@ -149,3 +149,9 @@ So when the cache misses under heavy loads the straight forward solution will ma
 To avoid this we should cache a single data structure containing the call to the 1forge api, this way we can continue to serve requests by mapping the call to the appropriate response. a second thing to take into consideration is that the call should be cached only if it was successful, because we do not want to Forex to be unavailable for 5 minutes of the call fails, so what ever our solution is it should retry the call if it fails and then cache it when it succeeds.
 
 The simplest solution would be to use an Akka actor, the actor can safely store the call to the 1forge Api and map it to a the right rate for each request, and if the call fails it would be easy to implement scheduled retries.
+
+### task 3 : cleaned up the code added more unit tests and some integration tests
+
+I revisited my solution to prepare for the follow up interview, found some small hacks that bugged me and that needed clean up.
+
+I also added some integration and unit tests.

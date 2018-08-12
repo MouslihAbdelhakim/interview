@@ -9,16 +9,7 @@ case class Rate(
     pair: Rate.Pair,
     price: Price,
     timestamp: Timestamp
-) {
-  override def equals(obj: scala.Any): Boolean = obj match {
-    case that: Rate ⇒
-      that.pair == this.pair &&
-      that.price == this.price &&
-      that.timestamp.value.toEpochSecond == this.timestamp.value.toEpochSecond
-
-    case _ ⇒ false
-  }
-}
+)
 
 object Rate {
 

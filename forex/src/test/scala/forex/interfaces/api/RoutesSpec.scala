@@ -3,23 +3,25 @@ package forex.interfaces.api
 import akka.http.scaladsl.model.{ StatusCode, StatusCodes }
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import akka.http.scaladsl.unmarshalling.FromResponseUnmarshaller
 import forex.domain.{ Currency, Rate, Timestamp }
 import forex.interfaces.api.rates.Protocol.GetApiResponse
 import forex.interfaces.api.utils.Error
 import org.scalatest.{ FlatSpec, Matchers }
 import forex.main.Processes
 import org.scalatest.prop.TableDrivenPropertyChecks
-import forex.interfaces.api.utils.Error.{ ApiError, InternalError }
+import forex.interfaces.api.utils.Error.{ ApiError, BackEndError, InternalError }
 import forex.processes
 import forex.services.OneForge
 
 import scala.concurrent.Future
+import scala.reflect.ClassTag
 
 class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with TableDrivenPropertyChecks {
 
   import forex.interfaces.api.utils.ApiMarshallers._
 
-  val process = new Processes {
+  private val successfulProcess = new Processes {
     override implicit val _oneForge: OneForge[Future] = new OneForge[Future] {
       override def get(pair: Rate.Pair): Future[Either[Error.BackEndError, Rate]] = Future {
         Right(Rate(pair.from, pair.to, 1, Timestamp.now.value))
@@ -28,9 +30,19 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
     override val Rates: processes.rates.Processes[Future] = processes.Rates[Future]
   }
 
-  val forexApp = Routes(rates.Routes(process)).route
+  private val unsuccessfulProcces = new Processes {
+    override implicit val _oneForge: OneForge[Future] = new OneForge[Future] {
+      override def get(pair: Rate.Pair): Future[Either[Error.BackEndError, Rate]] = Future {
+        Left(BackEndError("1forge is inaccessible"))
+      }
+    }
+    override val Rates: processes.rates.Processes[Future] = processes.Rates[Future]
+  }
 
-  val currencyPairs = {
+  private val forexApp = Routes(rates.Routes(successfulProcess)).route
+  private val forexAppWithInaccessible1Forge = Routes(rates.Routes(unsuccessfulProcces)).route
+
+  private val currencyPairs = {
     val emptyTable = Table[Currency, Currency](
       ("from", "to")
     )
@@ -48,19 +60,9 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
       status shouldEqual expectedCodeStatus
     }
 
-  def checkThatPathReturnsAnApiError(route: Route, path: String) =
+  def checkThatPathReturnsA[ReturnType: FromResponseUnmarshaller: ClassTag](route: Route, path: String) =
     Get(path) ~> route ~> check {
-      responseAs[ApiError] shouldBe a[ApiError]
-    }
-
-  def checkThatPathReturnsAnInternalError(route: Route, path: String) =
-    Get(path) ~> route ~> check {
-      responseAs[InternalError] shouldBe a[InternalError]
-    }
-
-  def checkThatPathReturnsAGetApiResponse(route: Route, path: String) =
-    Get(path) ~> route ~> check {
-      responseAs[GetApiResponse] shouldBe a[GetApiResponse]
+      responseAs[ReturnType] shouldBe a[ReturnType]
     }
 
   "Forex" should "return Http code = BadRequest if Get query parameters `to` and `from` are not present" in
@@ -86,27 +88,43 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
       checkHttpCodeStatus(forexApp, s"/exchangeRate?from=$from&to=$to", StatusCodes.OK)
   }
 
+  it should "return Http code = InternalServerError when encountered an error when retrieving a rate" in forAll(
+    currencyPairs
+  ) { (from: Currency, to: Currency) ⇒
+    checkHttpCodeStatus(
+      forexAppWithInaccessible1Forge,
+      s"/exchangeRate?from=$from&to=$to",
+      StatusCodes.InternalServerError
+    )
+  }
+
   it should "return a JSON object of ApiError if Get query parameters `to` and `from` are not present" in
-    checkThatPathReturnsAnApiError(forexApp, "/exchangeRate?")
+    checkThatPathReturnsA[ApiError](forexApp, "/exchangeRate?")
 
   it should "return a JSON object of ApiError if Get query parameters `to` is not present" in
-    checkThatPathReturnsAnApiError(forexApp, "/exchangeRate?from=USD&")
+    checkThatPathReturnsA[ApiError](forexApp, "/exchangeRate?from=USD&")
 
   it should "return a JSON object of ApiError if Get query parameters `from` is not present" in
-    checkThatPathReturnsAnApiError(forexApp, "/exchangeRate?to=USD&")
+    checkThatPathReturnsA[ApiError](forexApp, "/exchangeRate?to=USD&")
 
   it should "return a JSON object of ApiError if Get query Parameter `from` contains an unsupported currency" in
-    checkThatPathReturnsAnApiError(forexApp, "/exchangeRate?from=pennySilver&to=USD")
+    checkThatPathReturnsA[ApiError](forexApp, "/exchangeRate?from=pennySilver&to=USD")
 
   it should "return a JSON object of ApiError if Get query Parameter `to` contains an unsupported currency" in
-    checkThatPathReturnsAnApiError(forexApp, "/exchangeRate?from=USD&to=SilverPennies")
+    checkThatPathReturnsA[ApiError](forexApp, "/exchangeRate?from=USD&to=SilverPennies")
 
   it should "return a JSON object of InternalError if path is anything but a `/`" in
-    checkThatPathReturnsAnInternalError(forexApp, "/path?from=USD&to=USD")
+    checkThatPathReturnsA[InternalError](forexApp, "/path?from=USD&to=USD")
 
-  it should "return a JSON object of InternalError for all supported currencies" in forAll(currencyPairs) {
+  it should "return a JSON object of GetApiResponse for all supported currencies" in forAll(currencyPairs) {
     (from: Currency, to: Currency) ⇒
-      checkThatPathReturnsAGetApiResponse(forexApp, s"/exchangeRate?from=$from&to=$to")
+      checkThatPathReturnsA[GetApiResponse](forexApp, s"/exchangeRate?from=$from&to=$to")
+  }
+
+  it should "return a Json object of BackEndError when encountered an error when retrieving a rate" in forAll(
+    currencyPairs
+  ) { (from: Currency, to: Currency) ⇒
+    checkThatPathReturnsA[BackEndError](forexAppWithInaccessible1Forge, s"/exchangeRate?from=$from&to=$to")
   }
 
   it should "return a JSON object with the same currency in the Get query parameters `from`" in forAll(currencyPairs) {
@@ -124,5 +142,4 @@ class RoutesSpec extends FlatSpec with Matchers with ScalatestRouteTest with Tab
         getApiResponse.to shouldBe to
       }
   }
-
 }

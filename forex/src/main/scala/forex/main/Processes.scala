@@ -11,14 +11,14 @@ import org.zalando.grafter.macros._
 
 import scala.concurrent.Future
 
-@defaultReader[oneForgeProcess]
+@defaultReader[OneForgeProcess]
 trait Processes {
   implicit val _oneForge: OneForge[Future]
   val Rates: forex.processes.rates.Processes[Future]
 }
 
 @readerOf[ApplicationConfig]
-case class oneForgeProcess(
+case class OneForgeProcess(
     oneForgeApiConfig: OneForgeApiConfig,
     actorSystems: ActorSystems,
     cacheConfig: CacheConfig
